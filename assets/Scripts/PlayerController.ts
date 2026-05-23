@@ -5,22 +5,19 @@ export default class PlayerController extends cc.Component {
 
     @property(cc.Integer) moveSpeed: number = 200; 
     @property(cc.Integer) jumpForce: number = 600;
-
-    // 🌟 新增：用來存放瑪利歐靜止時的預設圖片
-    @property(cc.SpriteFrame)
-    idleSprite: cc.SpriteFrame = null;
+    @property(cc.SpriteFrame) idleSprite: cc.SpriteFrame = null;
+    @property(cc.Vec2) spawnPos: cc.Vec2 = cc.v2(-400, -200);
 
     public isControllable: boolean = true; 
+    public isInvincible: boolean = false; 
 
     private rb: cc.RigidBody = null;
     private anim: cc.Animation = null;
-    // 🌟 新增：宣告 Sprite 元件，用來切換圖片
     private sprite: cc.Sprite = null; 
     
     private isMovingLeft: boolean = false;
     private isMovingRight: boolean = false;
     private isGrounded: boolean = false;
-
     private currentAnim: string = "";
 
     onLoad () {
@@ -30,7 +27,6 @@ export default class PlayerController extends cc.Component {
 
         this.rb = this.getComponent(cc.RigidBody);
         this.anim = this.getComponent(cc.Animation);
-        // 🌟 獲取角色身上的 Sprite 元件
         this.sprite = this.getComponent(cc.Sprite);
 
         let collider = this.getComponent(cc.PhysicsBoxCollider);
@@ -44,9 +40,7 @@ export default class PlayerController extends cc.Component {
     }
 
     start () {
-        if (this.rb) {
-            this.rb.awake = true;
-        }
+        if (this.rb) this.rb.awake = true;
     }
 
     onDestroy () {
@@ -57,23 +51,17 @@ export default class PlayerController extends cc.Component {
     onKeyDown (event) {
         if (!this.isControllable) return; 
         switch(event.keyCode) {
-            case cc.macro.KEY.a:
-            case cc.macro.KEY.left: this.isMovingLeft = true; break;
-            case cc.macro.KEY.d:
-            case cc.macro.KEY.right: this.isMovingRight = true; break;
-            case cc.macro.KEY.w:
-            case cc.macro.KEY.up:
-            case cc.macro.KEY.space: this.jump(); break;
+            case cc.macro.KEY.a: case cc.macro.KEY.left: this.isMovingLeft = true; break;
+            case cc.macro.KEY.d: case cc.macro.KEY.right: this.isMovingRight = true; break;
+            case cc.macro.KEY.w: case cc.macro.KEY.up: case cc.macro.KEY.space: this.jump(); break;
         }
     }
 
     onKeyUp (event) {
         if (!this.isControllable) return;
         switch(event.keyCode) {
-            case cc.macro.KEY.a:
-            case cc.macro.KEY.left: this.isMovingLeft = false; break;
-            case cc.macro.KEY.d:
-            case cc.macro.KEY.right: this.isMovingRight = false; break;
+            case cc.macro.KEY.a: case cc.macro.KEY.left: this.isMovingLeft = false; break;
+            case cc.macro.KEY.d: case cc.macro.KEY.right: this.isMovingRight = false; break;
         }
     }
 
@@ -83,13 +71,25 @@ export default class PlayerController extends cc.Component {
             velocity.y = this.jumpForce;
             this.rb.linearVelocity = velocity;
             this.isGrounded = false;
-            
             this.playAnimation("PlayerJump");
         }
     }
 
+    // 🌟 修正 1：如果碰到的是隱形牆，不要把它當成地板 (避免在空中碰到牆還能無限跳)
     onBeginContact (contact, selfCollider, otherCollider) {
+        if (otherCollider.node.name === "InvisibleWall") {
+            return; 
+        }
         this.isGrounded = true;
+    }
+
+    // 🌟 修正 2：利用 onPreSolve 實現穿牆術
+    // 這個函數會在物理引擎計算「要不要阻擋」之前觸發
+    onPreSolve (contact, selfCollider, otherCollider) {
+        if (otherCollider.node.name === "InvisibleWall") {
+            // 命令物理引擎：忽略這次的實體碰撞，讓我穿過去！
+            contact.disabled = true; 
+        }
     }
 
     update (dt) {
@@ -102,9 +102,9 @@ export default class PlayerController extends cc.Component {
             this.rb.linearVelocity = velocity;
             this.isMovingLeft = false;
             this.isMovingRight = false;
+            
             if (this.node.y < -500) this.handleDeath();
             
-            // 如果不能動，確保他回到預設站立狀態
             this.resetToIdle();
             return;
         }
@@ -121,7 +121,6 @@ export default class PlayerController extends cc.Component {
 
         this.rb.linearVelocity = velocity;
 
-        // --- 動畫狀態判斷 ---
         if (!this.isGrounded) {
             this.playAnimation("PlayerJump");
         } 
@@ -129,7 +128,6 @@ export default class PlayerController extends cc.Component {
             this.playAnimation("PlayerWalk");
         } 
         else {
-            // 🌟 呼叫恢復 Idle 狀態的函數
             this.resetToIdle();
         }
 
@@ -145,23 +143,31 @@ export default class PlayerController extends cc.Component {
         }
     }
 
-    // 🌟 獨立出一個重置為站立圖片的函數
     resetToIdle() {
         if (this.currentAnim !== "Idle") {
-            if (this.anim) this.anim.stop(); // 停止目前播放的動畫
-            
-            // 強制把圖片換回 idleSprite (靜止狀態的那張圖)
+            if (this.anim) this.anim.stop(); 
             if (this.sprite && this.idleSprite) {
                 this.sprite.spriteFrame = this.idleSprite;
             }
-            
             this.currentAnim = "Idle";
         }
     }
 
+    resetPosition() {
+        this.node.setPosition(this.spawnPos);
+        if (this.rb) {
+            this.rb.linearVelocity = cc.v2(0, 0);
+        }
+    }
+
     handleDeath () {
-        console.log("瑪利歐掉下去了！");
+        if (this.isInvincible) return;
+
+        console.log("💥 【玩家】觸發死亡/受傷機制！");
+        this.isInvincible = true;
+        this.isControllable = false;
         if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
+        
         let canvasNode = cc.find("Canvas");
         if (canvasNode) {
             let gm = canvasNode.getComponent("GameManager");

@@ -1,6 +1,6 @@
 const {ccclass, property} = cc._decorator;
-// 引入 PlayerController 以便控制瑪利歐能不能動
-import PlayerController from "./PlayerController"; 
+
+// 🌟 移除了對 PlayerController 的 import，斬斷循環依賴引發的當機風險！
 
 @ccclass
 export default class GameManager extends cc.Component {
@@ -11,48 +11,89 @@ export default class GameManager extends cc.Component {
     @property(cc.Label) scoreLabel: cc.Label = null;
     @property(cc.Label) timerLabel: cc.Label = null;
 
-    // 🌟 新增：綁定畫面上的 Game Start 和 Game Over 視窗
     @property(cc.Node) gameStartPanel: cc.Node = null;
     @property(cc.Node) gameOverPanel: cc.Node = null;
-
-    // 🌟 新增：綁定瑪利歐，用來在過場時把他的控制權鎖住
-    @property(PlayerController) playerCtrl: PlayerController = null;
 
     private life: number = 3;
     private score: number = 0;
     private timer: number = 300;
-    private isPlaying: boolean = false; // 記錄遊戲是否正在進行中
+    private isPlaying: boolean = false; 
 
     onLoad () {
         GameManager.instance = this;
         this.updateUI();
-        
-        // 場景一載入，立刻播放 Game Start 動畫
         this.playGameStartSequence();
     }
 
-    // 播放 Game Start 流程
+    // 🌟 動態尋找玩家腳本，不需要你在 Inspector 裡拖曳！
+    getPlayerCtrl () {
+        // 🌟 核心修正：因為瑪利歐放在 Canvas 底下，所以路徑必須加上 Canvas/
+        let playerNode = cc.find("Canvas/Player");
+        
+        if (!playerNode) {
+            // 如果 Canvas 找不到，試著找最外層當作備用
+            playerNode = cc.find("Player");
+        }
+
+        if (playerNode) {
+            return playerNode.getComponent("PlayerController");
+        }
+        
+        console.error("🚨 嚴重錯誤：GameManager 找不到名叫 Player 的節點！請確認瑪利歐放在 Canvas 底下。");
+        return null;
+    }
+
     playGameStartSequence () {
         this.isPlaying = false;
+        console.log("🎬 【GameManager】開始播放 Game Start 過場...");
         
-        // 1. 鎖住瑪利歐的控制權
-        if (this.playerCtrl) this.playerCtrl.isControllable = false;
-        
-        // 2. 顯示 Game Start 畫面，隱藏 Game Over 畫面
-        if (this.gameStartPanel) this.gameStartPanel.active = true;
+        // 1. 顯示黑幕
+        if (this.gameStartPanel) {
+            this.gameStartPanel.active = true;
+        } else {
+            console.warn("🚨 警告：找不到 Game Start Panel！");
+        }
         if (this.gameOverPanel) this.gameOverPanel.active = false;
 
-        // 3. 等待 2 秒後，遊戲正式開始！
+        // 2. 傳送瑪利歐並鎖定
+        // 🌟 關鍵修復：物理引擎在「發生碰撞的瞬間」會鎖定座標，不允許強行移動物體。
+        // 我們利用 scheduleOnce(..., 0) 延遲到下一個影格（物理運算解鎖後），再把玩家抓回起點！
         this.scheduleOnce(() => {
+            let pCtrl = this.getPlayerCtrl();
+            if (pCtrl) {
+                // @ts-ignore
+                pCtrl.isControllable = false;
+                // @ts-ignore
+                pCtrl.isInvincible = true;
+                // @ts-ignore
+                if (pCtrl.resetPosition) pCtrl.resetPosition();
+            } else {
+                console.warn("🚨 警告：GameManager 找不到瑪利歐 (Player)！請確認他叫做 Player");
+            }
+        }, 0);
+
+        // 3. 計時 2 秒後開始遊戲
+        this.scheduleOnce(() => {
+            console.log("🎮 【GameManager】過場結束，遊戲開始！");
             if (this.gameStartPanel) this.gameStartPanel.active = false;
-            if (this.playerCtrl) this.playerCtrl.isControllable = true;
-            this.isPlaying = true;
-            console.log("遊戲開始！");
+            
+            let pCtrl2 = this.getPlayerCtrl();
+            if (pCtrl2) {
+                // @ts-ignore
+                pCtrl2.isControllable = true;
+                
+                // 遊戲開始後，再多給 1 秒的無敵保護時間，避免一重生就被怪碰到
+                this.scheduleOnce(() => {
+                    // @ts-ignore
+                    pCtrl2.isInvincible = false;
+                    console.log("🛡️ 【GameManager】無敵時間結束！");
+                }, 1.0);
+            }
+            this.isPlaying = true; // 🌟 恢復計時器
         }, 2.0);
     }
 
     update (dt) {
-        // 只有在遊玩狀態下才倒數時間
         if (this.isPlaying && this.timer > 0) {
             this.timer -= dt;
             if (this.timer <= 0) {
@@ -76,41 +117,34 @@ export default class GameManager extends cc.Component {
     }
 
     public decreaseLife () {
+        console.log("🩸 【GameManager】執行扣血！目前命數：", this.life - 1);
         this.life -= 1;
         this.updateUI();
 
         if (this.life > 0) {
-            // 還有命：重置位子，再播一次 Game Start
-            if (this.playerCtrl) {
-                // 請把這裡的座標換成你的地圖起點座標！
-                this.playerCtrl.node.setPosition(cc.v2(-400, -200));
-                // 把瑪利歐身上殘留的速度歸零，避免他帶著死掉前的速度亂飛
-                this.playerCtrl.getComponent(cc.RigidBody).linearVelocity = cc.v2(0, 0);
-            }
-            // 重新播放 Game Start 流程
             this.playGameStartSequence();
         } else {
-            // 沒命了：Game Over！
             this.gameOver();
         }
     }
 
     private handleTimeUp () {
-        console.log("時間到！");
+        console.log("⏰ 時間到！");
         this.decreaseLife();
     }
 
     private gameOver () {
-        console.log("Game Over!");
+        console.log("💀 Game Over!");
         this.isPlaying = false;
         
-        // 1. 鎖住瑪利歐的控制
-        if (this.playerCtrl) this.playerCtrl.isControllable = false;
+        let pCtrl = this.getPlayerCtrl();
+        if (pCtrl) {
+            // @ts-ignore
+            pCtrl.isControllable = false;
+        }
         
-        // 2. 顯示 Game Over 畫面
         if (this.gameOverPanel) this.gameOverPanel.active = true;
 
-        // 3. 等待 3 秒後，回到關卡選擇畫面
         this.scheduleOnce(() => {
             cc.director.loadScene("LevelSelect");
         }, 3.0);

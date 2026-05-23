@@ -3,36 +3,31 @@ const {ccclass, property} = cc._decorator;
 @ccclass
 export default class CameraController extends cc.Component {
 
-    // 用來綁定我們的瑪利歐角色
     @property(cc.Node)
     player: cc.Node = null;
 
-    // 攝影機最左邊的限制 (預設 0 代表畫面不會捲動到出生點更左邊)
     @property(cc.Integer)
     minX: number = 0; 
 
-    // 攝影機最右邊的限制 (避免看到地圖最右邊外的黑邊)
-    // 💡 公式：地圖總寬度 - 960 (Canvas寬度)。假設地圖寬 1600，這裡就是 640。
     @property(cc.Integer)
-    maxX: number = 640; 
+    maxX: number = 2000; // 給一個大一點的極限值
 
     update (dt) {
-        // 如果沒有綁定玩家，就不執行
         if (!this.player) return;
 
-        // 取得玩家目前的 X 座標
         let targetX = this.player.x;
 
-        // 限制攝影機的移動範圍，避免超出地圖邊界
-        if (targetX < this.minX) {
-            targetX = this.minX;
-        }
-        if (targetX > this.maxX) {
-            targetX = this.maxX;
-        }
+        if (targetX < this.minX) targetX = this.minX;
+        if (targetX > this.maxX) targetX = this.maxX;
 
-        // 讓攝影機平滑跟隨 (原為: this.node.x = targetX)
-        // 加上一點延遲插值，畫面看起來會更柔和專業！
-        this.node.x = this.node.x + (targetX - this.node.x) * dt * 5;
+        // 🌟 關鍵修改 1：檢查瑪利歐是不是剛「重生」
+        // 如果攝影機距離瑪利歐超過 300，代表發生了瞬間移動，攝影機也直接跟過去
+        if (Math.abs(targetX - this.node.x) > 300) {
+            this.node.x = targetX;
+        } else {
+            // 🌟 關鍵修改 2：把原本的 5 調大到 15。
+            // 這樣既保留了平滑的效果(不會震動)，又不會因為瑪利歐跑太快而落後！
+            this.node.x = this.node.x + (targetX - this.node.x) * dt * 15;
+        }
     }
 }
