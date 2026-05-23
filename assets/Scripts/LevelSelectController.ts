@@ -3,23 +3,33 @@ const {ccclass, property} = cc._decorator;
 @ccclass
 export default class LevelSelectController extends cc.Component {
 
-    // 當玩家點擊「第一關」時執行
+    // 綁定教學視窗，用來開啟/關閉它
+    @property(cc.Node)
+    tutorialPanel: cc.Node = null;
+
+    // 當玩家點擊「？」按鈕時執行
+    onQuestionButtonClicked () {
+        if (this.tutorialPanel) {
+            this.tutorialPanel.active = true; // 顯示教學視窗
+        }
+    }
+
+    // 當玩家點擊教學視窗上的「關閉」按鈕時執行
+    onCloseTutorialClicked () {
+        if (this.tutorialPanel) {
+            this.tutorialPanel.active = false; // 隱藏教學視窗
+        }
+    }
+
+    // 進入第一關的按鈕
     onLevel1Clicked () {
         console.log("進入第一關...");
-        // 載入我們做好的瑪利歐遊戲場景
         cc.director.loadScene("GameScene");
     }
 
-    // 當玩家點擊「返回」時執行
+    // 返回開始畫面的按鈕
     onBackClicked () {
         console.log("返回開始畫面...");
-        // 返回開始選單
         cc.director.loadScene("StartMenu");
-    }
-    
-    // 如果你有做第二關，可以再加一個 onLevel2Clicked 函數
-    onLevel2Clicked () {
-        console.log("進入第二關...");
-        // cc.director.loadScene("GameScene2");
     }
 }
