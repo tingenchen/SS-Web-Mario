@@ -13,7 +13,7 @@
   },
   {
     "__type__": "cc.Node",
-    "_name": "Enemy",
+    "_name": "Turtle",
     "_objFlags": 0,
     "_parent": null,
     "_children": [],
@@ -48,8 +48,8 @@
     },
     "_contentSize": {
       "__type__": "cc.Size",
-      "width": 20,
-      "height": 24
+      "width": 16,
+      "height": 27
     },
     "_anchorPoint": {
       "__type__": "cc.Vec2",
@@ -60,8 +60,8 @@
       "__type__": "TypedArray",
       "ctor": "Float64Array",
       "array": [
-        0,
-        -208.926,
+        35.353,
+        -209.521,
         0,
         0,
         0,
@@ -81,8 +81,8 @@
     "_skewX": 0,
     "_skewY": 0,
     "_is3DNode": false,
-    "_groupIndex": 0,
-    "groupIndex": 0,
+    "_groupIndex": 1,
+    "groupIndex": 1,
     "_id": ""
   },
   {
@@ -101,7 +101,7 @@
     "_srcBlendFactor": 770,
     "_dstBlendFactor": 771,
     "_spriteFrame": {
-      "__uuid__": "114966e9-aac0-4fa3-9e85-66bd5bda19d1"
+      "__uuid__": "9cc937fa-1838-44fe-8c83-75fc3be9f775"
     },
     "_type": 0,
     "_sizeMode": 1,
@@ -115,8 +115,44 @@
     "_fillRange": 0,
     "_isTrimmedMode": true,
     "_atlas": {
-      "__uuid__": "e1d15b5f-4483-4075-91ab-6482f23dcb81"
+      "__uuid__": "8d1f9ba9-b78d-4b5d-8aec-12d2d90a7f24"
     },
+    "_id": ""
+  },
+  {
+    "__type__": "e083bGfjNVLRo2/LG/wj6Hy",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 1
+    },
+    "_enabled": true,
+    "walkSpeed": 50,
+    "shellSpeed": 100,
+    "scoreValue": 200,
+    "shellSprite": {
+      "__uuid__": "d3c08c87-1bc1-4507-b652-1003d621a456"
+    },
+    "_id": ""
+  },
+  {
+    "__type__": "cc.Animation",
+    "_name": "",
+    "_objFlags": 0,
+    "node": {
+      "__id__": 1
+    },
+    "_enabled": true,
+    "_defaultClip": null,
+    "_clips": [
+      {
+        "__uuid__": "12d58275-9f4e-41c9-83a2-be1bf182ec6c"
+      },
+      {
+        "__uuid__": "8208a66d-c417-4cd4-9c10-a1da860ea75e"
+      }
+    ],
+    "playOnLoad": false,
     "_id": ""
   },
   {
@@ -161,45 +197,13 @@
     "_offset": {
       "__type__": "cc.Vec2",
       "x": 0,
-      "y": -3.9
+      "y": 0
     },
     "_size": {
       "__type__": "cc.Size",
       "width": 16,
-      "height": 15.2
+      "height": 27
     },
-    "_id": ""
-  },
-  {
-    "__type__": "60413LKhcpBEKPDzhtEPj6K",
-    "_name": "",
-    "_objFlags": 0,
-    "node": {
-      "__id__": 1
-    },
-    "_enabled": true,
-    "moveSpeed": 50,
-    "scoreValue": 200,
-    "_id": ""
-  },
-  {
-    "__type__": "cc.Animation",
-    "_name": "",
-    "_objFlags": 0,
-    "node": {
-      "__id__": 1
-    },
-    "_enabled": true,
-    "_defaultClip": null,
-    "_clips": [
-      {
-        "__uuid__": "7a2dd48c-c49b-4f43-bbea-adb6546b9246"
-      },
-      {
-        "__uuid__": "a2113e81-eaa6-4e77-b814-1b6fff877579"
-      }
-    ],
-    "playOnLoad": false,
     "_id": ""
   },
   {
