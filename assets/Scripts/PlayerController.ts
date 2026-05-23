@@ -11,6 +11,10 @@ export default class PlayerController extends cc.Component {
     public isControllable: boolean = true; 
     public isInvincible: boolean = false; 
 
+    // 🌟 記錄狀態：是否是超級瑪利歐，以及預設縮放大小
+    public isSuper: boolean = false;
+    private baseScale: number = 1.0; 
+
     private rb: cc.RigidBody = null;
     private anim: cc.Animation = null;
     private sprite: cc.Sprite = null; 
@@ -75,19 +79,13 @@ export default class PlayerController extends cc.Component {
         }
     }
 
-    // 🌟 修正 1：如果碰到的是隱形牆，不要把它當成地板 (避免在空中碰到牆還能無限跳)
     onBeginContact (contact, selfCollider, otherCollider) {
-        if (otherCollider.node.name === "InvisibleWall") {
-            return; 
-        }
+        if (otherCollider.node.name === "InvisibleWall") return; 
         this.isGrounded = true;
     }
 
-    // 🌟 修正 2：利用 onPreSolve 實現穿牆術
-    // 這個函數會在物理引擎計算「要不要阻擋」之前觸發
     onPreSolve (contact, selfCollider, otherCollider) {
         if (otherCollider.node.name === "InvisibleWall") {
-            // 命令物理引擎：忽略這次的實體碰撞，讓我穿過去！
             contact.disabled = true; 
         }
     }
@@ -102,22 +100,24 @@ export default class PlayerController extends cc.Component {
             this.rb.linearVelocity = velocity;
             this.isMovingLeft = false;
             this.isMovingRight = false;
-            
-            if (this.node.y < -500) this.handleDeath();
-            
+            // 🌟 如果掉出地圖，強制死亡 (不管是不是超大瑪利歐)
+            if (this.node.y < -500) this.handleDeath(true);
             this.resetToIdle();
             return;
         }
 
+        // 🌟 修正縮放邏輯，套用 baseScale (才能讓瑪利歐變大)
         if (this.isMovingLeft) {
             velocity.x = -this.moveSpeed;
-            this.node.scaleX = -Math.abs(this.node.scaleX);
+            this.node.scaleX = -this.baseScale;
         } else if (this.isMovingRight) {
             velocity.x = this.moveSpeed;
-            this.node.scaleX = Math.abs(this.node.scaleX);
+            this.node.scaleX = this.baseScale;
         } else {
             velocity.x = 0;
+            this.node.scaleX = Math.sign(this.node.scaleX) * this.baseScale;
         }
+        this.node.scaleY = this.baseScale;
 
         this.rb.linearVelocity = velocity;
 
@@ -131,9 +131,7 @@ export default class PlayerController extends cc.Component {
             this.resetToIdle();
         }
 
-        if (this.node.y < -500) {
-            this.handleDeath();
-        }
+        if (this.node.y < -500) this.handleDeath(true);
     }
 
     playAnimation(animName: string) {
@@ -155,15 +153,53 @@ export default class PlayerController extends cc.Component {
 
     resetPosition() {
         this.node.setPosition(this.spawnPos);
-        if (this.rb) {
-            this.rb.linearVelocity = cc.v2(0, 0);
+        if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
+        
+        // 🌟 重生時變回小瑪利歐
+        this.isSuper = false;
+        this.baseScale = 1.0;
+    }
+
+    // 🌟 新增：吃蘑菇變大
+    grow() {
+        if (this.isSuper) return; // 已經是大的就不再變大
+        
+        console.log("🍄 吃到蘑菇了！變大！");
+        this.isSuper = true;
+        this.baseScale = 1.5; // 放大 1.5 倍
+        
+        let canvasNode = cc.find("Canvas");
+        if (canvasNode) {
+            let gm = canvasNode.getComponent("GameManager");
+            // @ts-ignore
+            if (gm) gm.addScore(1000);
         }
     }
 
-    handleDeath () {
-        if (this.isInvincible) return;
+    // 🌟 更新死亡邏輯：加入 forceKill 參數，以及變小保護機制
+    handleDeath (forceKill: boolean = false) {
+        // 如果已經無敵，且不是強制死亡(掉進深淵)，就忽略
+        if (this.isInvincible && !forceKill) return;
 
-        console.log("💥 【玩家】觸發死亡/受傷機制！");
+        // 如果是超級瑪利歐，且沒有掉進深淵 -> 縮小並獲得無敵，不用死！
+        if (this.isSuper && !forceKill) {
+            console.log("🛡️ 超級瑪利歐受傷，退回小瑪利歐！");
+            this.isSuper = false;
+            this.baseScale = 1.0; // 縮回原大小
+            this.isInvincible = true;
+            
+            // 給予 2 秒的無敵閃爍時間
+            setTimeout(() => {
+                if (cc.isValid(this.node)) {
+                    this.isInvincible = false;
+                    console.log("退化無敵時間結束！");
+                }
+            }, 2000);
+            return; // 提早結束，不呼叫扣命
+        }
+
+        // --- 真正死亡的流程 ---
+        console.log("💥 【玩家】觸發死亡！");
         this.isInvincible = true;
         this.isControllable = false;
         if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
