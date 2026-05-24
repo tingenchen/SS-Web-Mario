@@ -40,6 +40,8 @@ export default class GameManager extends cc.Component {
     onLoad () {
         GameManager.instance = this;
         cc.audioEngine.stopMusic();
+        //要刪掉!
+        //cc.director.getPhysicsManager().debugDrawFlags = cc.PhysicsManager.DrawBits.e_aabbBit | cc.PhysicsManager.DrawBits.e_shapeBit;
         this.updateUI();
         this.playGameStartSequence();
     }
