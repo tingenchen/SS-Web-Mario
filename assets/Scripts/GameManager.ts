@@ -5,6 +5,10 @@ export default class GameManager extends cc.Component {
 
     public static instance: GameManager = null;
 
+    // 🌟 新增：用來設定當前是第幾關 (Level 1 就設 1, Level 2 就設 2)
+    @property(cc.Integer)
+    currentLevel: number = 1;
+
     @property(cc.Label) lifeLabel: cc.Label = null;
     @property(cc.Label) scoreLabel: cc.Label = null;
     @property(cc.Label) timerLabel: cc.Label = null;
@@ -13,21 +17,14 @@ export default class GameManager extends cc.Component {
     @property(cc.Node) gameOverPanel: cc.Node = null;
     @property(cc.Label) resultLabel: cc.Label = null; 
 
-    // ==========================================
-    // 🌟 聲音資源綁定 (Audio Clips)
-    // ==========================================
     @property({ type: cc.AudioClip, tooltip: "背景音樂 (會循環)" })
     bgmClip: cc.AudioClip = null;
-
     @property({ type: cc.AudioClip, tooltip: "過關音效" })
     levelClearClip: cc.AudioClip = null;
-
     @property({ type: cc.AudioClip, tooltip: "遊戲徹底結束音效" })
     gameOverClip: cc.AudioClip = null;
-
     @property({ type: cc.AudioClip, tooltip: "死掉一次的音效" })
     loseLifeClip: cc.AudioClip = null;
-
     @property({ type: cc.AudioClip, tooltip: "吃到金幣音效" })
     coinClip: cc.AudioClip = null;
 
@@ -38,15 +35,11 @@ export default class GameManager extends cc.Component {
     private isPlaying: boolean = false; 
     private isResetting: boolean = false; 
 
-    // 用來記錄目前正在播放的 BGM ID，方便停止
     private bgmAudioId: number = -1;
 
     onLoad () {
         GameManager.instance = this;
-        
-        // 🌟 進入遊戲場景時，立刻停止選單的音樂
         cc.audioEngine.stopMusic();
-
         this.updateUI();
         this.playGameStartSequence();
     }
@@ -85,17 +78,13 @@ export default class GameManager extends cc.Component {
             if (pCtrl2) {
                 // @ts-ignore
                 pCtrl2.isControllable = true;
-                
                 this.scheduleOnce(() => {
                     // @ts-ignore
                     pCtrl2.isInvincible = false;
                 }, 1.0);
             }
             this.isPlaying = true; 
-
-            // 🌟 遊戲正式開始，播放背景音樂 (BGM)
             this.playBGM();
-
         }, 2.0);
     }
 
@@ -107,22 +96,20 @@ export default class GameManager extends cc.Component {
                 this.handleTimeUp();
             }
             if (this.timerLabel) {
-                this.timerLabel.string = "TIME: " + Math.ceil(this.timer).toString();
+                this.timerLabel.string = ": " + Math.ceil(this.timer).toString();
             }
         }
     }
 
     updateUI () {
-        if (this.lifeLabel) this.lifeLabel.string = "LIFE: " + GameManager.globalLife;
+        if (this.lifeLabel) this.lifeLabel.string = ": " + GameManager.globalLife;
         if (this.scoreLabel) this.scoreLabel.string = "SCORE: " + GameManager.globalScore;
     }
 
     public addScore (points: number) {
         GameManager.globalScore += points;
         this.updateUI();
-        
-        // 🌟 吃到金幣時呼叫此函數，播放金幣音效
-        if (points === 100 && this.coinClip) { // 假設金幣是 100 分
+        if (points === 100 && this.coinClip) { 
             cc.audioEngine.playEffect(this.coinClip, false);
         }
     }
@@ -135,13 +122,10 @@ export default class GameManager extends cc.Component {
         this.updateUI();
 
         cc.systemEvent.emit("CLEANUP_ITEMS");
-
-        this.stopBGM(); // 死掉時停掉 BGM
+        this.stopBGM(); 
 
         if (GameManager.globalLife > 0) {
-            // 🌟 播放扣命音效
             if (this.loseLifeClip) cc.audioEngine.playEffect(this.loseLifeClip, false);
-            
             let sceneName = cc.director.getScene().name;
             cc.director.loadScene(sceneName);
         } else {
@@ -181,7 +165,6 @@ export default class GameManager extends cc.Component {
         let physicsManager = cc.director.getPhysicsManager();
         if (physicsManager) physicsManager.enabled = false;
 
-        // 🌟 停掉 BGM 並播放結算音效
         this.stopBGM();
         if (isWin && this.levelClearClip) {
             cc.audioEngine.playEffect(this.levelClearClip, false);
@@ -192,19 +175,32 @@ export default class GameManager extends cc.Component {
         if (isWin) {
             let firebase = window['firebase'];
             if (firebase && firebase.database && firebase.auth && firebase.auth().currentUser) {
-                let email = firebase.auth().currentUser.email;
+                let user = firebase.auth().currentUser;
                 let finalScore = GameManager.globalScore;
-                let playerName = email.split('@')[0]; 
-                
+                let playerName = user.email.split('@')[0]; 
                 let timeSpent = 300 - Math.ceil(this.timer);
                 
+                // 上傳至排行榜
                 firebase.database().ref("leaderboard").push({
                     name: playerName,
                     score: finalScore,
                     time: timeSpent,
-                    level: 1
+                    level: this.currentLevel // 🌟 動態記錄是第幾關
                 });
-                console.log("勝利！分數已上傳:", finalScore, "時間:", timeSpent);
+                console.log(`勝利！分數已上傳: 關卡 ${this.currentLevel}`);
+
+                // 🌟 記錄玩家解鎖進度 (將下一關解鎖)
+                let nextLevel = this.currentLevel + 1;
+                let userRef = firebase.database().ref("users/" + user.uid + "/unlockedLevel");
+                
+                // 檢查雲端紀錄，如果現在的通關進度大於雲端，就更新它
+                userRef.once("value").then((snapshot) => {
+                    let currentUnlocked = snapshot.val() || 1;
+                    if (nextLevel > currentUnlocked) {
+                        userRef.set(nextLevel);
+                        console.log(`恭喜！已解鎖 Level ${nextLevel}`);
+                    }
+                });
             }
         }
 
@@ -212,15 +208,11 @@ export default class GameManager extends cc.Component {
             GameManager.globalLife = 3;
             GameManager.globalScore = 0;
             cc.director.loadScene("LevelSelect");
-        }, 5.0); // 延長到 5 秒，讓玩家聽完結算音效
+        }, 5.0); 
     }
 
-    // ==========================================
-    // 🌟 音效控制輔助函數
-    // ==========================================
     private playBGM () {
         if (this.bgmClip) {
-            // playMusic 第二個參數 true 代表要循環播放 (Loop)
             this.bgmAudioId = cc.audioEngine.playMusic(this.bgmClip, true);
         }
     }
