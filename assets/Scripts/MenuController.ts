@@ -55,14 +55,14 @@ export default class MenuController extends cc.Component {
         let firebase = window['firebase'];
         if (!firebase.apps.length) {
             const firebaseConfig = {
-                apiKey: "AIzaSyBp8qvEOmyTM5cIl36JpE9wnbXKD-fOMR0",
-                authDomain: "software-studio-7a874.firebaseapp.com",
-                databaseURL: "https://software-studio-7a874-default-rtdb.firebaseio.com",
-                projectId: "software-studio-7a874",
-                storageBucket: "software-studio-7a874.firebasestorage.app",
-                messagingSenderId: "1095518903414",
-                appId: "1:1095518903414:web:a5f8b3c83bf5d050449357",
-                measurementId: "G-61GRW4JF86"
+                apiKey: "AIzaSyAvYObZsq6rwk2fswS8JAKyV8U6-GpknA0",
+                authDomain: "mario-9c275.firebaseapp.com",
+                databaseURL: "https://mario-9c275-default-rtdb.asia-southeast1.firebasedatabase.app",
+                projectId: "mario-9c275",
+                storageBucket: "mario-9c275.firebasestorage.app",
+                messagingSenderId: "836461475375",
+                appId: "1:836461475375:web:a046b8a052a74e4214b8da",
+                measurementId: "G-BCXW3WS2E1"
             };
             firebase.initializeApp(firebaseConfig);
         }
