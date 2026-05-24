@@ -2697,6 +2697,9 @@
     "alertLabel": {
       "__id__": 56
     },
+    "menuBgm": {
+      "__uuid__": "8ff8e32e-9d51-45da-971a-e1a8d643fdc1"
+    },
     "_id": "4fKwoNkTdI3orVuiDbpYWP"
   }
 ]

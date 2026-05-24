@@ -8,12 +8,26 @@ export default class PlayerController extends cc.Component {
     @property(cc.SpriteFrame) idleSprite: cc.SpriteFrame = null;
     @property(cc.Vec2) spawnPos: cc.Vec2 = cc.v2(-400, -200);
 
+    // ==========================================
+    // 🌟 聲音資源綁定
+    // ==========================================
+    @property({ type: cc.AudioClip, tooltip: "跳躍音效" })
+    jumpClip: cc.AudioClip = null;
+
+    @property({ type: cc.AudioClip, tooltip: "吃蘑菇變大音效" })
+    powerUpClip: cc.AudioClip = null;
+
+    @property({ type: cc.AudioClip, tooltip: "受傷縮小音效" })
+    powerDownClip: cc.AudioClip = null;
+
     public isControllable: boolean = true; 
     public isInvincible: boolean = false; 
 
-    // 🌟 記錄狀態：是否是超級瑪利歐，以及預設縮放大小
     public isSuper: boolean = false;
     private baseScale: number = 1.0; 
+    
+    private shrinkTimer: number = 0;
+    private readonly BIG_DURATION: number = 10; 
 
     private rb: cc.RigidBody = null;
     private anim: cc.Animation = null;
@@ -76,6 +90,9 @@ export default class PlayerController extends cc.Component {
             this.rb.linearVelocity = velocity;
             this.isGrounded = false;
             this.playAnimation("PlayerJump");
+
+            // 🌟 播放跳躍音效
+            if (this.jumpClip) cc.audioEngine.playEffect(this.jumpClip, false);
         }
     }
 
@@ -93,6 +110,13 @@ export default class PlayerController extends cc.Component {
     update (dt) {
         if (!this.rb) return;
 
+        if (this.isSuper) {
+            this.shrinkTimer -= dt;
+            if (this.shrinkTimer <= 0) {
+                this.shrinkBack(); 
+            }
+        }
+
         let velocity = this.rb.linearVelocity;
 
         if (!this.isControllable) {
@@ -100,13 +124,11 @@ export default class PlayerController extends cc.Component {
             this.rb.linearVelocity = velocity;
             this.isMovingLeft = false;
             this.isMovingRight = false;
-            // 🌟 如果掉出地圖，強制死亡 (不管是不是超大瑪利歐)
             if (this.node.y < -500) this.handleDeath(true);
             this.resetToIdle();
             return;
         }
 
-        // 🌟 修正縮放邏輯，套用 baseScale (才能讓瑪利歐變大)
         if (this.isMovingLeft) {
             velocity.x = -this.moveSpeed;
             this.node.scaleX = -this.baseScale;
@@ -155,18 +177,26 @@ export default class PlayerController extends cc.Component {
         this.node.setPosition(this.spawnPos);
         if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
         
-        // 🌟 重生時變回小瑪利歐
         this.isSuper = false;
         this.baseScale = 1.0;
+        this.shrinkTimer = 0;
+        this.node.scaleX = Math.sign(this.node.scaleX) * 1.0;
+        this.node.scaleY = 1.0;
     }
 
-    // 🌟 新增：吃蘑菇變大
     grow() {
-        if (this.isSuper) return; // 已經是大的就不再變大
-        
-        console.log("🍄 吃到蘑菇了！變大！");
+        console.log("🍄 吃到蘑菇了！變大或重置時間！");
         this.isSuper = true;
-        this.baseScale = 1.5; // 放大 1.5 倍
+        this.baseScale = 1.5;
+        this.shrinkTimer = this.BIG_DURATION; 
+        
+        // 🌟 播放變大音效 (Power Up)
+        if (this.powerUpClip) cc.audioEngine.playEffect(this.powerUpClip, false);
+        
+        let currentSign = Math.sign(this.node.scaleX) || 1;
+        cc.tween(this.node)
+            .to(0.3, { scaleX: currentSign * 1.5, scaleY: 1.5 })
+            .start();
         
         let canvasNode = cc.find("Canvas");
         if (canvasNode) {
@@ -176,29 +206,45 @@ export default class PlayerController extends cc.Component {
         }
     }
 
-    // 🌟 更新死亡邏輯：加入 forceKill 參數，以及變小保護機制
+    private shrinkBack() {
+        console.log("⏳ 變大時間到，縮小回去！");
+        this.isSuper = false;
+        this.baseScale = 1.0;
+        
+        // 🌟 播放縮小音效 (Power Down)
+        if (this.powerDownClip) cc.audioEngine.playEffect(this.powerDownClip, false);
+
+        let currentSign = Math.sign(this.node.scaleX) || 1;
+        cc.tween(this.node)
+            .to(0.3, { scaleX: currentSign * 1.0, scaleY: 1.0 })
+            .start();
+    }
+
     handleDeath (forceKill: boolean = false) {
-        // 如果已經無敵，且不是強制死亡(掉進深淵)，就忽略
         if (this.isInvincible && !forceKill) return;
 
-        // 如果是超級瑪利歐，且沒有掉進深淵 -> 縮小並獲得無敵，不用死！
         if (this.isSuper && !forceKill) {
             console.log("🛡️ 超級瑪利歐受傷，退回小瑪利歐！");
             this.isSuper = false;
-            this.baseScale = 1.0; // 縮回原大小
+            this.baseScale = 1.0; 
+            this.shrinkTimer = 0; 
             this.isInvincible = true;
             
-            // 給予 2 秒的無敵閃爍時間
+            // 🌟 播放受傷退化音效 (Power Down)
+            if (this.powerDownClip) cc.audioEngine.playEffect(this.powerDownClip, false);
+
+            this.node.scaleX = Math.sign(this.node.scaleX) * 1.0;
+            this.node.scaleY = 1.0;
+            
             setTimeout(() => {
                 if (cc.isValid(this.node)) {
                     this.isInvincible = false;
                     console.log("退化無敵時間結束！");
                 }
             }, 2000);
-            return; // 提早結束，不呼叫扣命
+            return; 
         }
 
-        // --- 真正死亡的流程 ---
         console.log("💥 【玩家】觸發死亡！");
         this.isInvincible = true;
         this.isControllable = false;

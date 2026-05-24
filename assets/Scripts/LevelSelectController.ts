@@ -12,7 +12,16 @@ export default class LevelSelectController extends cc.Component {
     @property(cc.Label)
     leaderboardLabel: cc.Label = null;
 
+    // 🌟 新增：綁定選單音樂
+    @property({ type: cc.AudioClip, tooltip: "選單背景音樂" })
+    menuBgm: cc.AudioClip = null;
+
     onLoad() {
+        // 🌟 播放選單音樂 (如果還沒在播放的話，確保音樂不會因為切換畫面而從頭重播)
+        if (this.menuBgm && !cc.audioEngine.isMusicPlaying()) {
+            cc.audioEngine.playMusic(this.menuBgm, true);
+        }
+
         if (typeof window['firebase'] !== 'undefined' && !window['firebase'].database) {
             let scriptDb = document.createElement('script');
             scriptDb.src = "https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js";

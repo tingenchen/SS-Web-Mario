@@ -7,7 +7,6 @@ export default class Enemy extends cc.Component {
     @property(cc.Integer) scoreValue: number = 200;
 
     private rb: cc.RigidBody = null;
-    // 🌟 新增：宣告動畫元件
     private anim: cc.Animation = null;
     
     private direction: number = -1;
@@ -16,12 +15,10 @@ export default class Enemy extends cc.Component {
 
     onLoad () {
         this.rb = this.getComponent(cc.RigidBody);
-        // 🌟 取得動畫元件
         this.anim = this.getComponent(cc.Animation);
     }
 
     start () {
-        // 🌟 遊戲一開始，就讓敵人自動播放走路動畫
         if (this.anim) {
             this.anim.play("EnemyWalk");
         }
@@ -47,16 +44,14 @@ export default class Enemy extends cc.Component {
         if (this.isDead) return;
         let other = otherCollider.node;
 
+        // 1. 如果撞到設定好的隱形牆，翻轉！
         if (other.name === "InvisibleWall") {
-            let now = Date.now();
-            if (now - this.lastFlipTime > 100) {
-                this.direction *= -1;
-                this.lastFlipTime = now;
-            }
+            this.flipDirection();
             return; 
         }
 
-        if (other.name === "Player") {
+        // 2. 如果撞到玩家，執行傷害或被踩死的邏輯
+        if (other.name === "Player" || other.name.includes("Player")) {
             if (other.y > this.node.y + 10) {
                 this.die(); 
                 
@@ -80,6 +75,29 @@ export default class Enemy extends cc.Component {
                     playerCtrl.handleDeath();
                 }
             }
+            return;
+        }
+
+        // 🌟 3. 關鍵修復：如果是撞到一般的實體牆壁或地板 (Static RigidBody)
+        let otherRb = other.getComponent(cc.RigidBody);
+        if (otherRb && otherRb.type === cc.RigidBodyType.Static) {
+            // 取得碰撞的「法線」(Normal)，用來判斷是撞到側面還是上下
+            let normal = contact.getWorldManifold().normal;
+            
+            // 如果 X 軸的碰撞力道大於 Y 軸，代表是撞到了「側面」的牆壁或水管！
+            if (Math.abs(normal.x) > Math.abs(normal.y)) {
+                this.flipDirection();
+            }
+        }
+    }
+
+    // 🌟 新增：把翻轉方向獨立成一個輔助函數，避免程式碼重複
+    private flipDirection() {
+        let now = Date.now();
+        // 加上 100ms 的冷卻時間，避免卡在牆角一秒鐘翻轉好幾十次
+        if (now - this.lastFlipTime > 100) {
+            this.direction *= -1;
+            this.lastFlipTime = now;
         }
     }
 
@@ -87,18 +105,13 @@ export default class Enemy extends cc.Component {
         this.isDead = true;
         if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
         
-        // 死亡時關閉碰撞體，瑪利歐就能直接穿過去不會卡住
         let collider = this.getComponent(cc.PhysicsBoxCollider);
         if (collider) collider.enabled = false;
         
-        // 🌟 播放死亡動畫 (例如變成扁掉的烏龜/蘑菇)
         if (this.anim) {
             this.anim.play("EnemyDeath");
         }
         
-        // 🌟 關鍵修改：將銷毀時間從原本的 50ms 延長到 0.5 秒 (500ms)
-        // 這樣「死亡扁掉」的動畫才有時間播完給玩家看，然後才消失！
-        // 我們改用 Cocos 內建的 scheduleOnce 比較安全
         this.scheduleOnce(() => {
             if (cc.isValid(this.node)) this.node.destroy();
         }, 0.5); 

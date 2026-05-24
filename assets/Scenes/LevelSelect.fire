@@ -3496,6 +3496,9 @@
     "leaderboardLabel": {
       "__id__": 61
     },
+    "menuBgm": {
+      "__uuid__": "8ff8e32e-9d51-45da-971a-e1a8d643fdc1"
+    },
     "_id": "f5wlzNP7BHlL7vnR6rlqj8"
   }
 ]

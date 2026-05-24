@@ -12,11 +12,21 @@ export default class MenuController extends cc.Component {
     @property(cc.Label)
     alertLabel: cc.Label = null;
 
+    // 🌟 新增：綁定選單音樂
+    @property({ type: cc.AudioClip, tooltip: "選單背景音樂" })
+    menuBgm: cc.AudioClip = null;
+
     private isFirebaseReady: boolean = false;
 
     onLoad() {
         // 預設顏色改為黑色
         this.setAlert("正在連線至伺服器...", cc.Color.BLACK);
+
+        // 🌟 播放選單音樂 (如果還沒在播放的話)
+        if (this.menuBgm && !cc.audioEngine.isMusicPlaying()) {
+            cc.audioEngine.playMusic(this.menuBgm, true);
+        }
+
         this.loadFirebaseScripts();
     }
 
