@@ -3,7 +3,7 @@
   "_name": "EnemyWalk",
   "_objFlags": 0,
   "_native": "",
-  "_duration": 0.1,
+  "_duration": 0.18333333333333332,
   "sample": 60,
   "speed": 1,
   "wrapMode": 2,
@@ -14,13 +14,19 @@
           {
             "frame": 0,
             "value": {
-              "__uuid__": "114966e9-aac0-4fa3-9e85-66bd5bda19d1"
+              "__uuid__": "4d57f9a3-cb1b-4dd6-a674-9d0f1b86e905"
             }
           },
           {
             "frame": 0.08333333333333333,
             "value": {
-              "__uuid__": "177f95b5-cb4b-4be3-8ad6-982ab2c4591a"
+              "__uuid__": "4139f09a-63ae-497c-a316-f7769301399e"
+            }
+          },
+          {
+            "frame": 0.16666666666666666,
+            "value": {
+              "__uuid__": "4d57f9a3-cb1b-4dd6-a674-9d0f1b86e905"
             }
           }
         ]

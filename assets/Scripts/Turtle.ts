@@ -1,10 +1,11 @@
 const {ccclass, property} = cc._decorator;
 
-// 🌟 定義烏龜的三種狀態
+// 🌟 新增 DEAD 狀態
 enum TurtleState {
     WALK,       // 正常走路
     SHELL_IDLE, // 靜止龜殼
-    SHELL_MOVE  // 高速滑行龜殼
+    SHELL_MOVE, // 高速滑行龜殼
+    DEAD        // 死亡彈飛中
 }
 
 @ccclass
@@ -45,6 +46,12 @@ export default class Turtle extends cc.Component {
 
     update (dt) {
         if (!this.rb) return;
+
+        // 🌟 如果已經死了，什麼都不做，讓物理引擎(重力)帶著它往下掉
+        if (this.state === TurtleState.DEAD) {
+            if (this.node.y < -600) this.node.destroy(); // 掉出螢幕外再銷毀
+            return;
+        }
         
         let velocity = this.rb.linearVelocity;
 
@@ -56,7 +63,6 @@ export default class Turtle extends cc.Component {
         } else if (this.state === TurtleState.SHELL_MOVE) {
             velocity.x = this.direction * this.shellSpeed; 
             
-            // 🌟 核心解法：當處於滑行狀態時，每幀手動掃描並輾死敵人！
             this.checkKillEnemies();
         }
 
@@ -65,30 +71,22 @@ export default class Turtle extends cc.Component {
         if (this.node.y < -600) this.node.destroy();
     }
 
-    // 🌟 新增：手動偵測並擊殺敵人 (AABB 矩形碰撞檢查)
     checkKillEnemies() {
-        // 取得龜殼目前的「世界座標碰撞框」
         let myBox = this.node.getBoundingBoxToWorld();
-        
-        // 取得場景上同階層的所有節點 (敵人們通常都在同一個父節點下)
         let siblings = this.node.parent.children;
         
         for (let i = 0; i < siblings.length; i++) {
             let other = siblings[i];
             
-            // 略過自己，以及被隱藏/銷毀的節點
             if (other === this.node || !other.active) continue;
             
             let enemyCtrl = other.getComponent("Enemy");
             let turtleCtrl = other.getComponent("Turtle");
             
-            // 只要對方身上有敵人腳本，或是名字叫做敵人
             if (enemyCtrl || turtleCtrl || other.name.includes("Enemy") || other.name.includes("Turtle")) {
                 let otherBox = other.getBoundingBoxToWorld();
                 
-                // 💥 如果雙方的框框重疊了！代表撞到了！
                 if (myBox.intersects(otherBox)) {
-                    // 防呆：如果對方正在翻肚死亡中 (scaleY 為 -1)，就忽略他
                     if (other.scaleY === -1) continue; 
 
                     console.log("💥 【龜殼】無視物理群組，手動輾死敵人：", other.name);
@@ -106,8 +104,6 @@ export default class Turtle extends cc.Component {
         }
     }
 
-    // 🌟 關鍵修復：物理穿透機制！
-    // 讓滑行的龜殼可以直接無視對方的剛體撞過去，才不會因為互相推擠而無法擊殺
     onPreSolve (contact, selfCollider, otherCollider) {
         let other = otherCollider.node;
 
@@ -119,7 +115,6 @@ export default class Turtle extends cc.Component {
         if (this.state === TurtleState.SHELL_MOVE) {
             let enemyCtrl = other.getComponent("Enemy");
             let turtleCtrl = other.getComponent("Turtle");
-            // 如果撞到的是敵人，直接取消物理推擠，準備秒殺他
             if (enemyCtrl || (turtleCtrl && turtleCtrl !== this) || other.name.includes("Enemy")) {
                 contact.disabled = true;
             }
@@ -130,7 +125,7 @@ export default class Turtle extends cc.Component {
         let other = otherCollider.node;
 
         if (other.name === "InvisibleWall") {
-            if (this.state !== TurtleState.SHELL_IDLE) {
+            if (this.state !== TurtleState.SHELL_IDLE && this.state !== TurtleState.DEAD) {
                 let now = Date.now();
                 if (now - this.lastFlipTime > 100) {
                     this.direction *= -1;
@@ -162,7 +157,6 @@ export default class Turtle extends cc.Component {
                 this.kickCooldown = true;
                 setTimeout(() => { this.kickCooldown = false; }, 200);
 
-                // 🌟 新增：播放龜殼滑行的動畫
                 if (this.anim) {
                     this.anim.play("TurtleShellMove");
                 }
@@ -175,7 +169,7 @@ export default class Turtle extends cc.Component {
                 if (other.y > this.node.y + 10) {
                     this.state = TurtleState.SHELL_IDLE;
                     this.bouncePlayer(playerRb);
-                    this.becomeShell(); // 踩停時，變回靜止的龜殼
+                    this.becomeShell(); 
                 } else {
                     if (playerCtrl) playerCtrl.handleDeath();
                 }
@@ -185,7 +179,6 @@ export default class Turtle extends cc.Component {
             if (this.state === TurtleState.SHELL_MOVE) {
                 let isEnemy = false;
 
-                // 嘗試用元件尋找並殺死
                 let enemyCtrl = other.getComponent("Enemy");
                 if (enemyCtrl) {
                     enemyCtrl.die(); 
@@ -198,7 +191,6 @@ export default class Turtle extends cc.Component {
                     isEnemy = true;
                 }
 
-                // 🌟 終極防呆：就算腳本抓不到，只要節點名字有 Enemy 或 Turtle，強制抹殺！
                 if (!isEnemy && (other.name.includes("Enemy") || other.name.includes("Turtle"))) {
                     console.log("【龜殼】強制輾死敵人：", other.name);
                     other.destroy();
@@ -245,15 +237,29 @@ export default class Turtle extends cc.Component {
         }
     }
 
+    // 🌟 核心修改：真正的物理彈飛死亡邏輯
     die () {
-        if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
+        if (this.state === TurtleState.DEAD) return; // 避免重複觸發
+        this.state = TurtleState.DEAD; // 切換狀態，停止 update 干擾
+
+        if (this.anim) this.anim.stop(); // 停止走路動畫
+        
+        // 讓牠死掉的時候變成龜殼圖案，再彈飛會比較自然 (符合瑪利歐風格)
+        if (this.sprite && this.shellSprite) {
+            this.sprite.spriteFrame = this.shellSprite;
+        }
+
+        this.node.scaleY = -1; // 翻肚
+        
         let collider = this.getComponent(cc.PhysicsBoxCollider);
-        if (collider) collider.enabled = false;
+        if (collider) collider.enabled = false; // 關閉碰撞，讓牠穿透地板
         
-        this.node.scaleY = -1; 
-        
-        this.scheduleOnce(() => {
-            if (cc.isValid(this.node)) this.node.destroy();
-        }, 0.5);
+        // 給予往上的強烈物理速度，實現「被踢飛」的視覺效果
+        if (this.rb) {
+            this.rb.linearVelocity = cc.v2(0, 500); 
+        }
+
+        // 移除原有的 0.5 秒 delay 銷毀
+        // 牠現在會自然地遵循重力掉下去，掉過 -600 的邊界時在 update 裡被摧毀
     }
 }
