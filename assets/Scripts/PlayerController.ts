@@ -8,9 +8,6 @@ export default class PlayerController extends cc.Component {
     @property(cc.SpriteFrame) idleSprite: cc.SpriteFrame = null;
     @property(cc.Vec2) spawnPos: cc.Vec2 = cc.v2(-400, -200);
 
-    // ==========================================
-    // 🌟 聲音資源綁定
-    // ==========================================
     @property({ type: cc.AudioClip, tooltip: "跳躍音效" })
     jumpClip: cc.AudioClip = null;
 
@@ -19,6 +16,10 @@ export default class PlayerController extends cc.Component {
 
     @property({ type: cc.AudioClip, tooltip: "受傷縮小音效" })
     powerDownClip: cc.AudioClip = null;
+
+    // 🌟 新增：踩踏敵人音效
+    @property({ type: cc.AudioClip, tooltip: "踩踏敵人音效" })
+    stompClip: cc.AudioClip = null;
 
     public isControllable: boolean = true; 
     public isInvincible: boolean = false; 
@@ -37,6 +38,9 @@ export default class PlayerController extends cc.Component {
     private isMovingRight: boolean = false;
     private isGrounded: boolean = false;
     private currentAnim: string = "";
+
+    private isDead: boolean = false;
+    private lastGrowTime: number = 0;
 
     onLoad () {
         let physicsManager = cc.director.getPhysicsManager();
@@ -67,7 +71,7 @@ export default class PlayerController extends cc.Component {
     }
 
     onKeyDown (event) {
-        if (!this.isControllable) return; 
+        if (!this.isControllable || this.isDead) return; 
         switch(event.keyCode) {
             case cc.macro.KEY.a: case cc.macro.KEY.left: this.isMovingLeft = true; break;
             case cc.macro.KEY.d: case cc.macro.KEY.right: this.isMovingRight = true; break;
@@ -76,7 +80,7 @@ export default class PlayerController extends cc.Component {
     }
 
     onKeyUp (event) {
-        if (!this.isControllable) return;
+        if (!this.isControllable || this.isDead) return;
         switch(event.keyCode) {
             case cc.macro.KEY.a: case cc.macro.KEY.left: this.isMovingLeft = false; break;
             case cc.macro.KEY.d: case cc.macro.KEY.right: this.isMovingRight = false; break;
@@ -84,21 +88,28 @@ export default class PlayerController extends cc.Component {
     }
 
     jump () {
-        if (this.isGrounded && this.rb) {
+        if (this.isGrounded && this.rb && !this.isDead) {
             let velocity = this.rb.linearVelocity;
             velocity.y = this.jumpForce;
             this.rb.linearVelocity = velocity;
             this.isGrounded = false;
             this.playAnimation("PlayerJump");
 
-            // 🌟 播放跳躍音效
             if (this.jumpClip) cc.audioEngine.playEffect(this.jumpClip, false);
         }
     }
 
     onBeginContact (contact, selfCollider, otherCollider) {
+        if (this.isDead) return; 
         if (otherCollider.node.name === "InvisibleWall") return; 
-        this.isGrounded = true;
+
+        let normal = contact.getWorldManifold().normal;
+
+        if (Math.abs(normal.y) > Math.abs(normal.x)) {
+            if (this.rb && this.rb.linearVelocity.y <= 0.1) {
+                this.isGrounded = true;
+            }
+        }
     }
 
     onPreSolve (contact, selfCollider, otherCollider) {
@@ -108,6 +119,7 @@ export default class PlayerController extends cc.Component {
     }
 
     update (dt) {
+        if (this.isDead) return; 
         if (!this.rb) return;
 
         if (this.isSuper) {
@@ -124,6 +136,7 @@ export default class PlayerController extends cc.Component {
             this.rb.linearVelocity = velocity;
             this.isMovingLeft = false;
             this.isMovingRight = false;
+            
             if (this.node.y < -500) this.handleDeath(true);
             this.resetToIdle();
             return;
@@ -180,17 +193,30 @@ export default class PlayerController extends cc.Component {
         this.isSuper = false;
         this.baseScale = 1.0;
         this.shrinkTimer = 0;
+        
+        this.isDead = false; 
+        this.isControllable = true;
+        this.isInvincible = false;
+        
+        let colliders = this.getComponents(cc.Collider);
+        for (let c of colliders) {
+            c.enabled = true;
+        }
+
         this.node.scaleX = Math.sign(this.node.scaleX) * 1.0;
         this.node.scaleY = 1.0;
     }
 
     grow() {
+        let now = Date.now();
+        if (now - this.lastGrowTime < 100) return; 
+        this.lastGrowTime = now;
+
         console.log("🍄 吃到蘑菇了！變大或重置時間！");
         this.isSuper = true;
         this.baseScale = 1.5;
         this.shrinkTimer = this.BIG_DURATION; 
         
-        // 🌟 播放變大音效 (Power Up)
         if (this.powerUpClip) cc.audioEngine.playEffect(this.powerUpClip, false);
         
         let currentSign = Math.sign(this.node.scaleX) || 1;
@@ -211,7 +237,6 @@ export default class PlayerController extends cc.Component {
         this.isSuper = false;
         this.baseScale = 1.0;
         
-        // 🌟 播放縮小音效 (Power Down)
         if (this.powerDownClip) cc.audioEngine.playEffect(this.powerDownClip, false);
 
         let currentSign = Math.sign(this.node.scaleX) || 1;
@@ -220,7 +245,15 @@ export default class PlayerController extends cc.Component {
             .start();
     }
 
+    // 🌟 新增：專門用來播放踩踏音效的函數
+    public playStompSound() {
+        if (this.stompClip) {
+            cc.audioEngine.playEffect(this.stompClip, false);
+        }
+    }
+
     handleDeath (forceKill: boolean = false) {
+        if (this.isDead) return; 
         if (this.isInvincible && !forceKill) return;
 
         if (this.isSuper && !forceKill) {
@@ -230,7 +263,6 @@ export default class PlayerController extends cc.Component {
             this.shrinkTimer = 0; 
             this.isInvincible = true;
             
-            // 🌟 播放受傷退化音效 (Power Down)
             if (this.powerDownClip) cc.audioEngine.playEffect(this.powerDownClip, false);
 
             this.node.scaleX = Math.sign(this.node.scaleX) * 1.0;
@@ -246,9 +278,16 @@ export default class PlayerController extends cc.Component {
         }
 
         console.log("💥 【玩家】觸發死亡！");
+        this.isDead = true; 
         this.isInvincible = true;
         this.isControllable = false;
+        
         if (this.rb) this.rb.linearVelocity = cc.v2(0, 0);
+        
+        let colliders = this.getComponents(cc.Collider);
+        for (let c of colliders) {
+            c.enabled = false;
+        }
         
         let canvasNode = cc.find("Canvas");
         if (canvasNode) {

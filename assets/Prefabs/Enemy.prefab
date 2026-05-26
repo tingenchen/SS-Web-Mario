@@ -176,7 +176,7 @@
       "__id__": 1
     },
     "_enabled": true,
-    "moveSpeed": 50,
+    "moveSpeed": 30,
     "scoreValue": 200,
     "_id": ""
   },

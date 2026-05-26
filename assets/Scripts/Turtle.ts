@@ -1,11 +1,10 @@
 const {ccclass, property} = cc._decorator;
 
-// 🌟 新增 DEAD 狀態
 enum TurtleState {
-    WALK,       // 正常走路
-    SHELL_IDLE, // 靜止龜殼
-    SHELL_MOVE, // 高速滑行龜殼
-    DEAD        // 死亡彈飛中
+    WALK,       
+    SHELL_IDLE, 
+    SHELL_MOVE, 
+    DEAD        
 }
 
 @ccclass
@@ -47,9 +46,8 @@ export default class Turtle extends cc.Component {
     update (dt) {
         if (!this.rb) return;
 
-        // 🌟 如果已經死了，什麼都不做，讓物理引擎(重力)帶著它往下掉
         if (this.state === TurtleState.DEAD) {
-            if (this.node.y < -600) this.node.destroy(); // 掉出螢幕外再銷毀
+            if (this.node.y < -600) this.node.destroy(); 
             return;
         }
         
@@ -146,6 +144,12 @@ export default class Turtle extends cc.Component {
                     this.becomeShell();
                     this.bouncePlayer(playerRb);
                     this.addScore();
+
+                    // 🌟 呼叫播放踩踏音效 (踩成龜殼)
+                    if (playerCtrl) {
+                        // @ts-ignore
+                        playerCtrl.playStompSound();
+                    }
                 } else {
                     if (playerCtrl) playerCtrl.handleDeath();
                 }
@@ -161,6 +165,7 @@ export default class Turtle extends cc.Component {
                     this.anim.play("TurtleShellMove");
                 }
 
+                // 🌟 (選擇性) 如果你有踢龜殼的特別音效，可以加在這裡。這裡暫時不加，保留原本手感。
                 this.node.x += this.direction * 5;
             } 
             else if (this.state === TurtleState.SHELL_MOVE) {
@@ -170,6 +175,12 @@ export default class Turtle extends cc.Component {
                     this.state = TurtleState.SHELL_IDLE;
                     this.bouncePlayer(playerRb);
                     this.becomeShell(); 
+
+                    // 🌟 呼叫播放踩踏音效 (踩停龜殼)
+                    if (playerCtrl) {
+                        // @ts-ignore
+                        playerCtrl.playStompSound();
+                    }
                 } else {
                     if (playerCtrl) playerCtrl.handleDeath();
                 }
@@ -237,29 +248,23 @@ export default class Turtle extends cc.Component {
         }
     }
 
-    // 🌟 核心修改：真正的物理彈飛死亡邏輯
     die () {
-        if (this.state === TurtleState.DEAD) return; // 避免重複觸發
-        this.state = TurtleState.DEAD; // 切換狀態，停止 update 干擾
+        if (this.state === TurtleState.DEAD) return; 
+        this.state = TurtleState.DEAD; 
 
-        if (this.anim) this.anim.stop(); // 停止走路動畫
+        if (this.anim) this.anim.stop(); 
         
-        // 讓牠死掉的時候變成龜殼圖案，再彈飛會比較自然 (符合瑪利歐風格)
         if (this.sprite && this.shellSprite) {
             this.sprite.spriteFrame = this.shellSprite;
         }
 
-        this.node.scaleY = -1; // 翻肚
+        this.node.scaleY = -1; 
         
         let collider = this.getComponent(cc.PhysicsBoxCollider);
-        if (collider) collider.enabled = false; // 關閉碰撞，讓牠穿透地板
+        if (collider) collider.enabled = false; 
         
-        // 給予往上的強烈物理速度，實現「被踢飛」的視覺效果
         if (this.rb) {
             this.rb.linearVelocity = cc.v2(0, 500); 
         }
-
-        // 移除原有的 0.5 秒 delay 銷毀
-        // 牠現在會自然地遵循重力掉下去，掉過 -600 的邊界時在 update 裡被摧毀
     }
 }

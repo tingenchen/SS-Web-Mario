@@ -44,24 +44,32 @@ export default class Enemy extends cc.Component {
         if (this.isDead) return;
         let other = otherCollider.node;
 
-        // 1. 如果撞到設定好的隱形牆，翻轉！
         if (other.name === "InvisibleWall") {
             this.flipDirection();
             return; 
         }
 
-        // 2. 如果撞到玩家，執行傷害或被踩死的邏輯
         if (other.name === "Player" || other.name.includes("Player")) {
+            // 判斷玩家是否在敵人上方 (踩踏判定)
             if (other.y > this.node.y + 10) {
                 this.die(); 
                 
                 let playerRb = other.getComponent(cc.RigidBody);
+                let playerCtrl = other.getComponent("PlayerController"); // 🌟 取得玩家控制器
+
+                // 讓玩家彈跳
                 if (playerRb) {
                     let v = playerRb.linearVelocity;
                     v.y = 500; 
                     playerRb.linearVelocity = v;
                 }
                 
+                // 🌟 呼叫播放踩踏音效
+                if (playerCtrl) {
+                    // @ts-ignore
+                    playerCtrl.playStompSound();
+                }
+
                 let canvasNode = cc.find("Canvas");
                 if (canvasNode) {
                     let gm = canvasNode.getComponent("GameManager");
@@ -78,23 +86,17 @@ export default class Enemy extends cc.Component {
             return;
         }
 
-        // 🌟 3. 關鍵修復：如果是撞到一般的實體牆壁或地板 (Static RigidBody)
         let otherRb = other.getComponent(cc.RigidBody);
         if (otherRb && otherRb.type === cc.RigidBodyType.Static) {
-            // 取得碰撞的「法線」(Normal)，用來判斷是撞到側面還是上下
             let normal = contact.getWorldManifold().normal;
-            
-            // 如果 X 軸的碰撞力道大於 Y 軸，代表是撞到了「側面」的牆壁或水管！
             if (Math.abs(normal.x) > Math.abs(normal.y)) {
                 this.flipDirection();
             }
         }
     }
 
-    // 🌟 新增：把翻轉方向獨立成一個輔助函數，避免程式碼重複
     private flipDirection() {
         let now = Date.now();
-        // 加上 100ms 的冷卻時間，避免卡在牆角一秒鐘翻轉好幾十次
         if (now - this.lastFlipTime > 100) {
             this.direction *= -1;
             this.lastFlipTime = now;

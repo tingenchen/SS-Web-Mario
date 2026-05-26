@@ -10,7 +10,6 @@ export default class LevelSelectController extends cc.Component {
     @property({ type: cc.AudioClip, tooltip: "選單背景音樂" })
     menuBgm: cc.AudioClip = null;
 
-    // 🌟 新增：綁定 Level 2 的按鈕
     @property(cc.Button)
     level2Button: cc.Button = null;
 
@@ -19,7 +18,6 @@ export default class LevelSelectController extends cc.Component {
             cc.audioEngine.playMusic(this.menuBgm, true);
         }
 
-        // 預設將 Level 2 按鈕鎖起來 (變灰且不能按)
         if (this.level2Button) {
             this.level2Button.interactable = false;
         }
@@ -30,32 +28,28 @@ export default class LevelSelectController extends cc.Component {
             document.head.appendChild(scriptDb);
             
             scriptDb.onload = () => {
-                this.checkLevelUnlock(); // 載入完畢後檢查進度
+                this.checkLevelUnlock(); 
             };
         } else {
-            this.checkLevelUnlock(); // 已經載入過就直接檢查
+            this.checkLevelUnlock(); 
         }
     }
 
-    // 🌟 新增：去 Firebase 查詢這個玩家解鎖到了第幾關
     checkLevelUnlock() {
         let firebase = window['firebase'];
         if (firebase && firebase.auth && firebase.database) {
-            // 監聽玩家是否已登入
             firebase.auth().onAuthStateChanged((user) => {
                 if (user) {
                     let userRef = firebase.database().ref("users/" + user.uid + "/unlockedLevel");
                     userRef.once("value").then(snapshot => {
-                        let unlockedLevel = snapshot.val() || 1; // 預設至少解鎖第 1 關
+                        let unlockedLevel = snapshot.val() || 1; 
                         console.log(`玩家 ${user.email} 目前解鎖至第 ${unlockedLevel} 關`);
                         
-                        // 如果進度大於等於 2，就把 Level 2 按鈕解鎖！
                         if (unlockedLevel >= 2 && this.level2Button) {
                             this.level2Button.interactable = true;
                         }
                     });
                 } else {
-                    // 如果是訪客(未登入)，永遠只能玩第一關
                     console.log("訪客狀態，僅開放第一關。");
                 }
             });
@@ -70,16 +64,14 @@ export default class LevelSelectController extends cc.Component {
         if (this.tutorialPanel) this.tutorialPanel.active = false;
     }
 
-    // 進入第一關
     onLevel1Clicked () {
         console.log("進入第一關...");
-        cc.director.loadScene("GameScene"); // 第一關場景名稱
+        cc.director.loadScene("GameScene"); 
     }
 
-    // 🌟 新增：進入第二關
     onLevel2Clicked () {
         console.log("進入第二關...");
-        cc.director.loadScene("Level2"); // 請確保你第二關的場景命名為 "Level2"
+        cc.director.loadScene("Level2"); 
     }
 
     onBackClicked () {
@@ -105,21 +97,41 @@ export default class LevelSelectController extends cc.Component {
         if (!firebase || !firebase.database) return;
 
         let db = firebase.database();
-        db.ref("leaderboard").orderByChild("score").limitToLast(5).once("value")
+        
+        // 🌟 修改 1：多抓一點資料回來自己排 (抓前 20 筆)
+        db.ref("leaderboard").orderByChild("score").limitToLast(20).once("value")
             .then((snapshot) => {
                 if (!snapshot.exists()) {
                     if (this.leaderboardLabel) this.leaderboardLabel.string = "目前還沒有分數紀錄喔！";
                     return;
                 }
+                
                 let scores = [];
                 snapshot.forEach((child) => { scores.push(child.val()); });
-                scores.reverse();
+
+                // 🌟 修改 2：JavaScript 自定義雙重排序 (分數降序 -> 時間升序)
+                scores.sort((a, b) => {
+                    // 先比分數 (b - a 代表由大到小排)
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    } 
+                    // 分數相同時，比時間 (a - b 代表由小到大排，時間越少越前面)
+                    else {
+                        // 防呆：如果早期測試資料沒有 time，當作 999 秒處理
+                        let timeA = a.time !== undefined ? a.time : 999;
+                        let timeB = b.time !== undefined ? b.time : 999;
+                        return timeA - timeB;
+                    }
+                });
+
+                // 🌟 修改 3：只切出前 5 名來顯示
+                let top5Scores = scores.slice(0, 5);
 
                 let displayText = "英雄榜 Top 5\n\n排名 | 玩家 | 關卡 | 時間 | 分數\n----------------------------------------\n";
-                for (let i = 0; i < scores.length; i++) {
-                    let lvl = scores[i].level || 1; 
-                    let timeVal = scores[i].time !== undefined ? scores[i].time : "--";
-                    displayText += `  ${i + 1}   | ${scores[i].name} |   ${lvl}   |   ${timeVal}   | ${scores[i].score}\n`;
+                for (let i = 0; i < top5Scores.length; i++) {
+                    let lvl = top5Scores[i].level || 1; 
+                    let timeVal = top5Scores[i].time !== undefined ? top5Scores[i].time : "--";
+                    displayText += `  ${i + 1}   | ${top5Scores[i].name} |   ${lvl}   |   ${timeVal}   | ${top5Scores[i].score}\n`;
                 }
                 if (this.leaderboardLabel) this.leaderboardLabel.string = displayText;
             });

@@ -127,7 +127,7 @@
       "__id__": 1
     },
     "_enabled": true,
-    "walkSpeed": 50,
+    "walkSpeed": 40,
     "shellSpeed": 100,
     "scoreValue": 200,
     "shellSprite": {
